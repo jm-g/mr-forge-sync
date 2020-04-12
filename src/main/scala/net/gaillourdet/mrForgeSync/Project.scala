@@ -26,7 +26,8 @@ case class Project(
   name: String,
   path: Path,
   id: Option[String],
-  uris: Seq[URI]
+  uris: Seq[URI],
+  archived: Boolean
 ) {
 
   def sshUrl: URI = {

@@ -49,7 +49,8 @@ class GitLabRepository(uri: URI, token: String) extends ForgeRepository {
       project.getName,
       new File(project.getPathWithNamespace).toPath,
       Some(project.getId.toString),
-      URI.create(project.getSshUrlToRepo) :: URI.create(project.getHttpUrlToRepo) :: Nil
+      URI.create(project.getSshUrlToRepo) :: URI.create(project.getHttpUrlToRepo) :: Nil,
+      project.getArchived
     )
   }
 }

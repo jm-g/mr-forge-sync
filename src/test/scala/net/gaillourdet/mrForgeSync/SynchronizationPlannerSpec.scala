@@ -39,7 +39,8 @@ class SynchronizationPlannerSpec
         Project("project",
           path("group/project"),
           Some("4711"),
-          Seq(URI.create("http://gitlab.com/group/project"))))
+          Seq(URI.create("http://gitlab.com/group/project")),
+          archived = false))
 
       val localProjects = Seq()
 
@@ -53,21 +54,23 @@ class SynchronizationPlannerSpec
       val project = Project("project",
         path("group/project"),
         Some("4711"),
-        Seq(URI.create("http://gitlab.com/group/project")))
+        Seq(URI.create("http://gitlab.com/group/project")),
+        archived = false)
       val remoteProjects = Seq(project)
 
       val localProjects = Seq(project)
 
       val result: Seq[Task] = new SynchronizationPlanner(remoteProjects, localProjects).tasks
 
-      result must contain theSameElementsAs Seq(NoOpTask(project, project))
+      result must contain theSameElementsAs Seq(NoOpTask(project, Some(project)))
     }
 
     "synchronize nothing for an already cloned project without local id but with matching url" in {
       val project = Project("project",
         path("group/project"),
         Some("4711"),
-        Seq(URI.create("http://gitlab.com/group/project")))
+        Seq(URI.create("http://gitlab.com/group/project")),
+        archived = false)
       val remoteProjects = Seq(project)
 
       val localProjects = Seq(project.copy(id = None))
@@ -81,7 +84,8 @@ class SynchronizationPlannerSpec
       val project = Project("project",
         path("group/project"),
         Some("4711"),
-        Seq(URI.create("http://gitlab.com/group/project")))
+        Seq(URI.create("http://gitlab.com/group/project")),
+        archived = false)
       val remoteProjects = Seq(project)
 
       val localProjects = Seq(project.copy(id = None, uris = Seq()))
@@ -95,7 +99,8 @@ class SynchronizationPlannerSpec
       val project = Project("project",
         path("group/project"),
         Some("4711"),
-        Seq(URI.create("http://gitlab.com/group/project")))
+        Seq(URI.create("http://gitlab.com/group/project")),
+        archived = false)
       val remoteProjects = Seq(project)
 
       val localProjects = Seq(project.copy(path = path("group/otherProject"), uris = Seq()))
@@ -110,7 +115,8 @@ class SynchronizationPlannerSpec
       val project = Project("project",
         path("group/project"),
         Some("4711"),
-        Seq(URI.create("http://gitlab.com/group/project")))
+        Seq(URI.create("http://gitlab.com/group/project")),
+        archived = false)
       val remoteProjects = Seq(project)
 
       val localProjects = Seq(project.copy(path = path("group/otherProject"), id = None))

@@ -28,26 +28,27 @@ class SynchronizationPlanner(
 ) {
 
   private lazy val localProjectsByUri = localProjects.view.flatMap(p => p.uris.map(uri => uri -> p)).toMap
-  private lazy val localProjectsById = localProjects.view.collect { case p@Project(_, _, Some(id), _) => (id, p) }.toMap
+  private lazy val localProjectsById = localProjects.view.collect { case p@Project(_, _, Some(id), _, _) => (id, p) }.toMap
   private lazy val localProjectsByPath = localProjects.view.map(p => p.path -> p).toMap
 
   def planTasks(remote: Project): Seq[Task] = remote match {
-    case Project(_, rPath, Some(id), _) if localProjectsById.contains(id) =>
+    case Project(_, rPath, Some(id), _, false) if localProjectsById.contains(id) =>
       localProjectsById.get(id) match {
-        case Some(l@Project(_, path, _, _)) if rPath == path => Seq(NoOpTask(remote, l))
-        case Some(l@Project(_, _, _, _)) => Seq(MoveTask(remote, l))
+        case l@Some(Project(_, path, _, _, _)) if rPath == path => Seq(NoOpTask(remote, l))
+        case Some(l@Project(_, _, _, _, _)) => Seq(MoveTask(remote, l))
       }
-    case Project(_, rPath, _, rUris) if rUris.exists(localProjectsByUri.contains) =>
+    case Project(_, rPath, _, rUris, false) if rUris.exists(localProjectsByUri.contains) =>
       rUris.view.flatMap(uri => localProjectsByUri.get(uri)).headOption match {
-        case Some(l@Project(_, path, _, _)) if rPath == path => Seq(StoreIdTask(remote, l))
-        case Some(l@Project(_, _, _, _)) => Seq(MoveTask(remote, l))
+        case Some(l@Project(_, path, _, _, _)) if rPath == path => Seq(StoreIdTask(remote, l))
+        case Some(l@Project(_, _, _, _, _)) => Seq(MoveTask(remote, l))
       }
-    case Project(_, rPath, _, _) if localProjectsByPath.contains(rPath) =>
+    case Project(_, rPath, _, _, false) if localProjectsByPath.contains(rPath) =>
       localProjectsByPath.get(rPath) match {
-        case Some(l@Project(_, _, _, _)) => Seq(AskIsCloneTask(remote, l))
+        case Some(l@Project(_, _, _, _, false)) => Seq(AskIsCloneTask(remote, l))
         case None => neverReached()
       }
-    case _ => Seq(CloneTask(remote))
+    case Project(_, _, _, _, false) => Seq(CloneTask(remote))
+    case Project(_, _, _, _, true) => Seq(NoOpTask(remote, None))
   }
 
   lazy val tasks: Seq[Task] = remoteProjects.flatMap(planTasks)
@@ -70,7 +71,7 @@ case class AskIsCloneTask(remote: Project, local: Project) extends Task {
 case class StoreIdTask(remote: Project, local: Project) extends Task {
   override def localProject: Option[Project] = Some(local)
 }
-case class NoOpTask(remote: Project, local: Project) extends Task {
-  override def localProject: Option[Project] = Some(local)
+case class NoOpTask(remote: Project, local: Option[Project]) extends Task {
+  override def localProject: Option[Project] = local
 }
 

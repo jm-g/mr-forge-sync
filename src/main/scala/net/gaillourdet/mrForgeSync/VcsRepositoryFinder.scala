@@ -80,7 +80,7 @@ class VcsRepositoryFinder(
   }
 
   def loadProject(path: Path) = {
-    Project(path.getFileName.toString, path, metaDataRepository.fetch(path, "gitlabProjectId"), getUris(path))
+    Project(path.getFileName.toString, path, metaDataRepository.fetch(path, "gitlabProjectId"), getUris(path), false)
   }
 }
 
