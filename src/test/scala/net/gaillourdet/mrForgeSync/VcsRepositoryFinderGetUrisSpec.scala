@@ -21,20 +21,23 @@ package net.gaillourdet.mrForgeSync
 
 import java.net.URI
 import java.nio.file.{Files, Path}
+import java.util.Comparator
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.scalatest.{BeforeAndAfterAll, MustMatchers, WordSpec}
+import org.scalatest.{BeforeAndAfterAll, LoneElement, MustMatchers, WordSpec}
 
 import scala.sys.process.Process
 
-class VcsRepositoryFinderSpec
+//noinspection TypeAnnotation
+class VcsRepositoryFinderGetUrisSpec
   extends WordSpec
     with MustMatchers
+    with LoneElement
     with BeforeAndAfterAll
 {
-  lazy val testBaseDirectory = Files.createTempDirectory("VcsRepositoryFinderSpec-")
+  lazy val testBaseDirectory = Files.createTempDirectory("VcsRepositoryFinderGetUrisSpec-")
 
-  var repositoryCounter = new AtomicInteger(0)
+  lazy val repositoryCounter = new AtomicInteger(0)
 
   override protected def beforeAll(): Unit = {
     // force creation of test directory
@@ -43,15 +46,28 @@ class VcsRepositoryFinderSpec
     testBaseDirectory.toFile.deleteOnExit()
   }
 
+
+  override protected def afterAll(): Unit = {
+    Files
+      .walk(testBaseDirectory)
+      .sorted(Comparator.reverseOrder())
+      .forEach(Files.delete _)
+
+    super.afterAll()
+  }
+
   def withGitRepository(body : Path => Unit): Unit = {
-    val repositoryIndex = repositoryCounter.getAndIncrement()
-    val repoPath = Files.createDirectory(testBaseDirectory.resolve(s"repo_$repositoryIndex"))
+    val repoPath: Path = Path.of(s"repo_${repositoryCounter.getAndIncrement()}")
+    val path = testBaseDirectory.resolve(repoPath)
+    Files.createDirectory(path)
     try {
-      Process(Seq("git", "init"), testBaseDirectory.resolve(repoPath).toFile).!!
-      body(repoPath)
+      Process(Seq("git", "init"), path.toFile).!!
+      body(path)
     } finally {
-      // TODO: implement cleanup
-//      Files.delete(repoPath)
+      Files
+        .walk(path)
+        .sorted(Comparator.reverseOrder())
+        .forEach(Files.delete _)
     }
   }
 
@@ -100,5 +116,4 @@ class VcsRepositoryFinderSpec
       uris must contain theSameElementsAs Seq(URI.create(url1),URI.create(url2))
     }
   }
-
 }

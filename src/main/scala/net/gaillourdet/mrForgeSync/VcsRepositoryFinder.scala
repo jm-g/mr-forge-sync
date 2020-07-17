@@ -19,13 +19,14 @@
 
 package net.gaillourdet.mrForgeSync
 
+import java.io.IOException
 import java.net.URI
+import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{FileVisitOption, Files, Path}
-import java.util.function.BiPredicate
+import java.util
 
-import scala.collection.JavaConverters._
 import scala.sys.process.Process
+import scala.util.matching.Regex
 
 
 class VcsRepositoryFinder(
@@ -33,31 +34,52 @@ class VcsRepositoryFinder(
   metaDataRepository: VcsRepositoryMetaDataRepository
 ) {
 
+  //noinspection SameParameterValue
   private def terminalAbort(errorMessage: String): Nothing = {
     Console.err.println(errorMessage)
     System.exit(1)
     throw new IllegalStateException()
   }
 
-  val pattern = "^remote\\.[^.]*\\.url (.*)$".r
-
-  private val matcher = new BiPredicate[Path, BasicFileAttributes] {
-
-    override def test(t: Path, u: BasicFileAttributes): Boolean = {
-      Files.isDirectory(t) /* symbolic links are followed */ &&
-        Files.exists(t.resolve(".git"))
-    }
-
-  }
+  private val pattern: Regex = "^remote\\.[^.]*\\.url (.*)$".r
 
   def find(): Seq[Project] = {
-    Files.find(rootDir, Int.MaxValue, matcher, FileVisitOption.FOLLOW_LINKS)
-      .iterator()
-      .asScala
-      .map(rootDir.relativize)
-      .map(p => { println(s"found local repository ${p.toString}"); p})
-      .map(loadProject)
-      .toSeq
+    val found = collection.mutable.ListBuffer.empty[Project]
+
+    Files.walkFileTree(rootDir, util.EnumSet.of(FileVisitOption.FOLLOW_LINKS), Int.MaxValue, new FileVisitor[Path] {
+
+      override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = {
+        if (Files.exists(dir.resolve(".git"))) {
+          val relativeDir = rootDir.relativize(dir)
+          found += loadProject(relativeDir)
+          println(s"found local repository $relativeDir")
+          FileVisitResult.SKIP_SUBTREE
+        } else if (Files.exists(dir.resolve(".svn")) || Files.exists(dir.resolve(".hg"))) {
+          FileVisitResult.SKIP_SUBTREE
+        } else {
+          FileVisitResult.CONTINUE
+        }
+      }
+
+      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+        FileVisitResult.CONTINUE
+      }
+
+      override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = {
+        exc match {
+          case _: AccessDeniedException =>
+            println(s"could not traverse $file")
+            FileVisitResult.SKIP_SUBTREE
+          case  _ => throw exc
+        }
+      }
+
+      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+        FileVisitResult.CONTINUE
+      }
+    })
+
+    found.to(List)
   }
 
   def getUris(repository: Path): Seq[URI] = {
@@ -79,8 +101,13 @@ class VcsRepositoryFinder(
     }
   }
 
-  def loadProject(path: Path) = {
-    Project(path.getFileName.toString, path, metaDataRepository.fetch(path, "gitlabProjectId"), getUris(path), false)
+  def loadProject(path: Path): Project = {
+    Project(
+      path.getFileName.toString,
+      path,
+      metaDataRepository.fetch(path, "gitlabProjectId"),
+      getUris(path),
+      archived = false)
   }
 }
 
